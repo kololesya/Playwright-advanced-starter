@@ -1,27 +1,27 @@
 import { expect, test } from '@playwright/test';
-import { StockPage } from '../module2/pages/StockPage.js';
+import { PageFactory } from '../module2/pages/Pages.js';
 
 test.describe('Stock trading', () => {
     test('Buying shares updates the cash balance and portfolio', async ({ page }) => {
-        const stockPage = new StockPage(page);
-        await stockPage.goto();
+        const { stockTradingPage } = new PageFactory(page);
+        await stockTradingPage.goto();
 
-        await stockPage.selectTicker('MSFT').click();
-        const marketPrice = Number(await stockPage.currentPrice().textContent());
+        await stockTradingPage.selectTicker('MSFT');
+        const marketPrice = await stockTradingPage.getCurrentPrice();
         const quantity = 2;
 
-        await stockPage.limitPriceInput().fill(marketPrice.toString());
-        await stockPage.quantityInput().fill(quantity.toString());
-        await stockPage.buyButton().click();
+        await stockTradingPage.enterPrice(marketPrice.toString());
+        await stockTradingPage.enterQuantity(quantity.toString());
+        await stockTradingPage.clickBuy();
 
         const expectedCash = (10_000 - marketPrice * quantity).toFixed(2);
 
         await expect(
-            stockPage.cashBalance(),
+            stockTradingPage.cashBalance(),
             'Cash should decrease by the total value of the purchase',
         ).toHaveText(expectedCash);
 
-        const portfolioRows = stockPage.portfolio().locator('tbody tr');
+        const portfolioRows = stockTradingPage.portfolioRows();
 
         await expect(
             portfolioRows,
@@ -35,47 +35,44 @@ test.describe('Stock trading', () => {
     });
 
     test('Selling part of a position updates its quantity and cash balance', async ({ page }) => {
-        const stockPage = new StockPage(page);
-        await stockPage.goto();
+        const { stockTradingPage } = new PageFactory(page);
+        await stockTradingPage.goto();
 
-        await stockPage.selectTicker('MSFT').click();
-        const marketPrice = Number(await stockPage.currentPrice().textContent());
+        await stockTradingPage.selectTicker('MSFT');
+        const marketPrice = await stockTradingPage.getCurrentPrice();
 
-        await stockPage.limitPriceInput().fill(marketPrice.toString());
-        await stockPage.quantityInput().fill('2');
-        await stockPage.buyButton().click();
+        await stockTradingPage.enterPrice(marketPrice.toString());
+        await stockTradingPage.enterQuantity('2');
+        await stockTradingPage.clickBuy();
 
-        await stockPage.selectTicker('MSFT').click();
-        await stockPage.limitPriceInput().fill(marketPrice.toString());
-        await stockPage.quantityInput().fill('1');
-        await stockPage.sellButton().click();
+        await stockTradingPage.selectTicker('MSFT');
+        await stockTradingPage.enterPrice(marketPrice.toString());
+        await stockTradingPage.enterQuantity('1');
+        await stockTradingPage.clickSell();
 
         const expectedCash = (10_000 - marketPrice).toFixed(2);
 
         await expect(
-            stockPage.cashBalance(),
+            stockTradingPage.cashBalance(),
             'Selling one of two shares should return the value of one share to cash',
         ).toHaveText(expectedCash);
 
-        const stockRow = stockPage
-            .portfolio()
-            .locator('tbody tr')
-            .filter({ hasText: 'MSFT' });
+        const stockRow = stockTradingPage.portfolioRows().filter({ hasText: 'MSFT' });
 
         await expect(stockRow).toHaveCount(1);
         await expect(stockRow.getByRole('cell').nth(1)).toHaveText('1');
     });
 
     test('A fractional quantity is rejected with a validation message', async ({ page }) => {
-        const stockPage = new StockPage(page);
-        await stockPage.goto();
+        const { stockTradingPage } = new PageFactory(page);
+        await stockTradingPage.goto();
 
-        await stockPage.selectTicker('MSFT').click();
-        await stockPage.quantityInput().fill('1.5');
-        await stockPage.buyButton().click();
+        await stockTradingPage.selectTicker('MSFT');
+        await stockTradingPage.enterQuantity('1.5');
+        await stockTradingPage.clickBuy();
 
         await expect(
-            stockPage.qtyError(),
+            stockTradingPage.quantityError(),
             'The form should explain that quantity must be a whole number',
         ).toHaveText('Quantity must be a whole number');
     });
